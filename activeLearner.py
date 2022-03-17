@@ -36,3 +36,30 @@ classifier = NeuralNetClassifier(Torch_Model,
                                  verbose=1,
                                  device=device)
 
+from modAL.models import ActiveLearner
+
+# initialize ActiveLearner
+learner = ActiveLearner(
+    estimator=classifier,
+    X_training=X_initial, y_training=y_initial,
+)
+
+# the active learning loop
+n_queries = 10
+for idx in range(n_queries):
+    print('Query no. %d' % (idx + 1))
+    query_idx, query_instance = learner.query(X_pool, n_instances=100)
+    learner.teach(
+        X=X_pool[query_idx], y=y_pool[query_idx], only_new=True,
+    )
+    # remove queried instance from pool
+    X_pool = np.delete(X_pool, query_idx, axis=0)
+    y_pool = np.delete(y_pool, query_idx, axis=0)
+
+#learner.fit(X_train, y_train)
+model_score = learner.score(X_test, y_test)
+
+print(model_score)
+
+
+
