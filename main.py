@@ -11,9 +11,9 @@ from sklearn.ensemble import RandomForestClassifier
 
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
-from tqdm.notebook import tqdm, trange
+#from tqdm.notebook import tqdm, trange
 #the line above may fail on google colab so you can use the line below in that case but progress bars will looks less nice
-#from tqdm import tqdm, trange
+from tqdm import tqdm, trange
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
