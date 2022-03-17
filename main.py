@@ -99,3 +99,16 @@ for i_repeat in tqdm(range(n_repeats)):
                 f'committe_{i_members}',
                 i_query,
                 score))
+
+df_results = pd.concat([pd.DataFrame(results)
+                        for results in
+                        [random_results, committee_results]])
+
+df_results_mean=df_results.groupby(['estimator','query_id']).mean()
+df_results_std=df_results.groupby(['estimator','query_id']).std()
+
+df_mean=df_results_mean.reset_index().pivot(index='query_id', columns='estimator', values='score')
+df_std=df_results_std.reset_index().pivot(index='query_id', columns='estimator', values='score')
+
+df_mean.plot(figsize=(8.5,6), yerr=df_std)
+plt.grid('on')
