@@ -1,4 +1,5 @@
 from collections import namedtuple
+from random import Random
 import pandas as pd
 import numpy as np
 import sys
@@ -7,8 +8,10 @@ import sys
 from modAL.disagreement import vote_entropy_sampling
 from modAL.models import ActiveLearner, Committee
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
+from sklearn.tree import DecisionTreeClassifier
 #from tqdm.notebook import tqdm, trange
 #the line above may fail on google colab so you can use the line below in that case but progress bars will looks less nice
 from tqdm import tqdm, trange
@@ -16,26 +19,18 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import sklearn
 
-lr=RandomForestClassifier()
-
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-ResultsRecord = namedtuple('ResultsRecord', ['estimator', 'query_id', 'score'])
-
-SEED = 1 # Set our RNG seed for reproducibility.
-
-n_queries = 75 # You can lower this to decrease run time
-
-# You can increase this to get error bars on your evaluation.
-# You probably need to use the parallel code to make this reasonable to compute
-n_repeats = 3
+SEED = 665
+N_samples = 25
+lr = RandomForestClassifier(random_state=SEED)
 
 from sklearn.datasets import load_iris, load_digits
 
 # loading the data dataset
-data_set = load_iris()
+data_set = load_digits()
 X = data_set['data']
 y = data_set['target']
 
@@ -46,28 +41,23 @@ Xtrain, Xtest, ytrain, ytest = train_test_split(
 Xpool = Xtrain.copy()
 ypool = ytrain.copy()
 
-np.random.seed(42) # random seed to ensure same results but feel free to change
-addn=2 #samples to add each time
 #randomize order of pool to avoid sampling the same subject sequentially
+np.random.seed(SEED) # random seed to ensure same results but feel free to change
 order=np.random.permutation(range(len(Xpool)))
+addn=2 #samples to add each time
+ninit = 10 #initial samples
+
 
 ### Random sampling baseline ###
-
-#samples in the pool
-poolidx=np.arange(len(Xpool),dtype='int32')
-ninit = 10 #initial samples
-#initial training set
+model=lr
+testacc=[]
 trainset=order[:ninit]
 Xtrain=np.take(Xpool,trainset,axis=0)
 ytrain=np.take(ypool,trainset,axis=0)
-
-#remove data from pool
+poolidx=np.arange(len(Xpool),dtype=np.int32)
 poolidx=np.setdiff1d(poolidx,trainset)
-
-model=lr
-testacc=[]
 print("Random Sampling")
-for i in tqdm(range(25)):
+for i in tqdm(range(N_samples)):
     #TODO fit model
     #Hints below:
     data = np.take(Xpool,order[:ninit+i*addn],axis=0)
@@ -80,7 +70,6 @@ for i in tqdm(range(25)):
     # print('Model: LR, %i random samples'%(ninit+i*addn))
 
 ### Uncertainty Sampling ###
-
 testacc_al=[]
 trainset=order[:ninit]
 Xtrain=np.take(Xpool,trainset,axis=0)
@@ -88,10 +77,11 @@ ytrain=np.take(ypool,trainset,axis=0)
 poolidx=np.arange(len(Xpool),dtype=np.int32)
 poolidx=np.setdiff1d(poolidx,trainset)
 print("Uncertainty Sampling")
-for i in tqdm(range(25)):
+for i in tqdm(range(N_samples)):
     # Fit and Accuracy
     ml = model.fit(Xtrain, ytrain)
     acc = model.score(Xtest, ytest)
+    # testacc_al.append((len(Xtrain), acc))
 
     # Find most uncertain sample
     label_probs = ml.predict_proba(Xpool[poolidx])
@@ -106,6 +96,7 @@ for i in tqdm(range(25)):
 
     testacc_al.append((ninit+i*addn,acc))
 
+
 ### Query By Committee ###
 testacc_qbc=[]
 ncomm=10
@@ -114,8 +105,8 @@ Xtrain=np.take(Xpool,trainset,axis=0)
 ytrain=np.take(ypool,trainset,axis=0)
 poolidx=np.arange(len(Xpool),dtype=np.int32)
 poolidx=np.setdiff1d(poolidx,trainset)
-print("Query by Committee")
-for i in tqdm(range(25)):
+print("QBC")
+for i in tqdm(range(N_samples)):
     ypool_lab = []
 
     for k in range(ncomm):
@@ -125,7 +116,15 @@ for i in tqdm(range(25)):
 
         ypool_lab.append(model.predict(Xpool[poolidx]))
     
-    ypool_p = (np.mean(np.array(ypool_lab) == 1,0), np.mean(np.array(ypool_lab)==2,0))
+    ypool_p = (np.mean(np.array(ypool_lab) == 0,0), np.mean(np.array(ypool_lab) == 1,0),
+                                                    np.mean(np.array(ypool_lab) ==2,0),
+                                                    np.mean(np.array(ypool_lab) ==3,0),
+                                                    np.mean(np.array(ypool_lab) ==4,0),
+                                                    np.mean(np.array(ypool_lab) ==5,0),
+                                                    np.mean(np.array(ypool_lab) ==6,0),
+                                                    np.mean(np.array(ypool_lab) ==7,0),
+                                                    np.mean(np.array(ypool_lab) ==8,0),
+                                                    np.mean(np.array(ypool_lab)==9,0))
     ypool_p = np.array(ypool_p).T
 
     model.fit(Xtrain, ytrain)
@@ -147,5 +146,5 @@ plt.plot(*random);
 plt.plot(*least_confidence);
 plt.plot(*qbc);
 plt.legend(('random sampling','uncertainty sampling','QBC'));
-print(f"Final accuracies: {random[-1]} (Random), {least_confidence[-1]} (QBC), {qbc[-1]} (Least Confidence)")
+print(f"Final accuracies: {random[-1]} (Random), {qbc[-1]} (QBC), {least_confidence[-1]} (Least Confidence)")
 plt.show();
